@@ -47,7 +47,7 @@ python3 -m http.server 8000
 # then visit http://localhost:8000
 ```
 
-You can also play it directly on [GitHub Pages](https://davinux.github.io/sudoku/) if enabled for the repository.
+You can also play it online at **[sudoku.davinux.net](https://sudoku.davinux.net)**.
 
 ## How to play
 
