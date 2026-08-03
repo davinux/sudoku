@@ -16,6 +16,7 @@ A fully client-side Sudoku game built as a single HTML file — no frameworks, n
 - **Live statistics** — a running timer, mistakes counter and hints counter.
 - **Best-time records** — your fastest solve is saved per difficulty in `localStorage`.
 - **In-progress save** — your current game is saved automatically and restored when you come back.
+- **Installable PWA** — a service worker caches the game so it works offline and can be added to your home screen.
 - **Keyboard support** — `1–9` to enter digits, arrow keys to move, `N` to toggle notes, `Ctrl+Z` to undo, `Backspace`/`Delete` to erase.
 - **Mobile friendly** — responsive layout and a touch-friendly number pad.
 - **Dark theme** with a clean, modern UI and clear 3×3 box borders.

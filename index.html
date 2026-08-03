@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#1e1e2e">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sudoku">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
 <title>Sudoku</title>
 <style>
   :root {
@@ -235,8 +243,8 @@
   }
 
   .num-pad button {
-    aspect-ratio: 2.2 / 1;
-    font-size: clamp(18px, 5vw, 28px);
+    height: clamp(38px, 8.5vh, 54px);
+    font-size: clamp(16px, 4.5vw, 24px);
     font-weight: 700;
     color: var(--text);
     background: var(--surface);
@@ -321,7 +329,7 @@
 </head>
 <body>
 <div class="app">
-  <header><h1>SUDOKU</h1></header>
+  <header><h1>Davinux's Sudoku</h1></header>
 
   <div class="difficulty" id="difficulty">
     <button data-diff="easy">Easy</button>
@@ -1000,6 +1008,10 @@
     if (!tryRestore()) newGame(diff);
   })();
 })();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
 </script>
 </body>
 </html>
