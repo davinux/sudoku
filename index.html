@@ -385,6 +385,7 @@
     <div class="btns col">
       <button id="menuCheck">Check solution</button>
       <button id="menuReveal">Reveal full solution</button>
+      <button id="menuInstall" class="hidden">Install app</button>
       <button id="menuNew">New game</button>
       <button id="menuClose" class="primary">Close</button>
     </div>
@@ -1012,6 +1013,25 @@
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");
 }
+
+let deferredInstall = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  document.getElementById("menuInstall").classList.remove("hidden");
+});
+document.getElementById("menuInstall").addEventListener("click", () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  deferredInstall.userChoice.finally(() => {
+    deferredInstall = null;
+    document.getElementById("menuInstall").classList.add("hidden");
+  });
+});
+window.addEventListener("appinstalled", () => {
+  deferredInstall = null;
+  document.getElementById("menuInstall").classList.add("hidden");
+});
 </script>
 </body>
 </html>

@@ -3,6 +3,7 @@
   "short_name": "Sudoku",
   "description": "A fully client-side Sudoku game",
   "lang": "en",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
