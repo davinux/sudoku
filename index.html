@@ -143,7 +143,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: clamp(16px, 4.4vw, 28px);
+    font-size: clamp(18px, 5vw, 32px);
     font-weight: 600;
     color: var(--text);
     border: 0.5px solid var(--border);
@@ -161,13 +161,14 @@
     padding: 1px;
     pointer-events: none;
   }
+  .cell .marks.hidden { display: none; }
 
   .cell .mark {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: clamp(6px, 1.5vw, 11px);
-    font-weight: 500;
+    font-size: clamp(8px, 2.2vw, 13px);
+    font-weight: 600;
     color: var(--text-dim);
   }
 
@@ -182,11 +183,12 @@
   .cell.bb { border-bottom: 2px solid var(--border); }
 
   .cell.given { color: var(--given); font-weight: 700; }
+  .cell.entered { color: var(--given); }
   .cell.selected { background: var(--accent-soft); }
   .cell.peer { background: rgba(255, 255, 255, 0.04); }
   .cell.same { background: var(--accent-soft); }
   .cell.conflict { color: var(--conflict) !important; }
-  .cell.solved-given { color: var(--ok) !important; }
+  .cell.complete { color: var(--ok) !important; }
 
   .cell .flash {
     position: absolute;
@@ -228,13 +230,13 @@
 
   .num-pad {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
   }
 
   .num-pad button {
-    aspect-ratio: 1.6 / 1;
-    font-size: clamp(18px, 4.5vw, 26px);
+    aspect-ratio: 2.2 / 1;
+    font-size: clamp(18px, 5vw, 28px);
     font-weight: 700;
     color: var(--text);
     background: var(--surface);
@@ -276,6 +278,7 @@
     padding: 20px;
   }
   .modal.show { display: flex; }
+  #confirmModal { z-index: 60; }
 
   .modal-card {
     background: var(--surface);
@@ -352,8 +355,8 @@
 
 <div class="modal" id="winModal">
   <div class="modal-card">
-    <div class="emoji">🏆</div>
-    <h2>Puzzle solved!</h2>
+    <div class="emoji" id="winEmoji">🏆</div>
+    <h2 id="winTitle">Puzzle solved!</h2>
     <p id="winStats"></p>
     <div class="btns">
       <button id="winSame">Same level</button>
@@ -380,19 +383,34 @@
   </div>
 </div>
 
+<div class="modal" id="confirmModal">
+  <div class="modal-card">
+    <div class="emoji">⚠️</div>
+    <h2>Start a new game?</h2>
+    <p>You have an unfinished game. Starting a new one will discard your current progress.</p>
+    <div class="btns">
+      <button id="confirmCancel">Cancel</button>
+      <button id="confirmNew" class="primary">New game</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   "use strict";
 
   // ---------- Difficulty config ----------
   const LEVELS = {
-    easy:   { clues: 38 },
-    medium: { clues: 32 },
-    hard:   { clues: 27 },
-    expert: { clues: 22 },
+    easy:   { clues: 38, mistakes: 5 },
+    medium: { clues: 32, mistakes: 4 },
+    hard:   { clues: 27, mistakes: 3 },
+    expert: { clues: 22, mistakes: 2 },
   };
-  const MAX_MISTAKES = 3;
   const SAVE_KEY = "sudoku-save";
+
+  function maxMistakes() {
+    return (LEVELS[diff] && LEVELS[diff].mistakes) || 3;
+  }
 
   // ---------- State ----------
   let grid, given, solution, pencil, history;
@@ -411,7 +429,10 @@
   const numPad = document.getElementById("numPad");
   const winModal = document.getElementById("winModal");
   const menuModal = document.getElementById("menuModal");
+  const confirmModal = document.getElementById("confirmModal");
   const winStats = document.getElementById("winStats");
+  const winEmoji = document.getElementById("winEmoji");
+  const winTitle = document.getElementById("winTitle");
 
   // ---------- Sudoku engine ----------
   const makeGrid = () => Array.from({ length: 9 }, () => Array(9).fill(0));
@@ -527,14 +548,29 @@
     }
   }
 
+  function getCompletedDigits() {
+    const done = new Set();
+    for (let n = 1; n <= 9; n++) {
+      let ok = true;
+      for (let r = 0; r < 9 && ok; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (solution[r][c] === n && grid[r][c] !== n) { ok = false; break; }
+        }
+      }
+      if (ok) done.add(n);
+    }
+    return done;
+  }
+
   function render() {
     const cells = board.children;
+    const completeDigits = getCompletedDigits();
     for (let r = 0; r < 9; r++) {
       for (let c = 0; c < 9; c++) {
         const el = cells[r * 9 + c];
         el.classList.remove(
           "selected", "peer", "same", "conflict", "given",
-          "solved-given", "flash-correct", "flash-wrong"
+          "entered", "complete", "flash-correct", "flash-wrong"
         );
         const v = grid[r][c];
         const isGiven = given[r][c] === 1;
@@ -542,17 +578,16 @@
 
         el.querySelector(".value").textContent = v !== 0 ? String(v) : "";
         el.classList.toggle("given", isGiven);
+        el.classList.toggle("entered", v !== 0 && !isGiven && isCorrect);
         el.classList.toggle("conflict", v !== 0 && !isGiven && !isCorrect);
-        el.classList.toggle("solved-given", v !== 0 && !isGiven && isCorrect);
+        el.classList.toggle("complete", v !== 0 && completeDigits.has(v));
 
         const marksEl = el.querySelector(".marks");
         const hasMarks = v === 0 && pencil[r][c] && pencil[r][c].size > 0;
         marksEl.classList.toggle("hidden", !hasMarks);
-        if (hasMarks) {
-          const ms = marksEl.children;
-          for (let i = 0; i < 9; i++) {
-            ms[i].textContent = pencil[r][c].has(i + 1) ? String(i + 1) : "";
-          }
+        const ms = marksEl.children;
+        for (let i = 0; i < 9; i++) {
+          ms[i].textContent = pencil[r][c] && pencil[r][c].has(i + 1) ? String(i + 1) : "";
         }
       }
     }
@@ -583,7 +618,7 @@
   function updateNumPad() {
     const counts = Array(10).fill(0);
     for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
-      if (given[r][c] !== 1 && grid[r][c] !== 0) counts[grid[r][c]]++;
+      if (grid[r][c] !== 0) counts[grid[r][c]]++;
     }
     for (let i = 1; i <= 9; i++) {
       const btn = numPad.querySelector('[data-num="' + i + '"]');
@@ -639,14 +674,14 @@
       removePencilPeers();
     } else {
       mistakes++;
-      mistakesEl.textContent = mistakes + "/" + MAX_MISTAKES;
+      mistakesEl.textContent = mistakes + "/" + maxMistakes();
       mistakesEl.classList.add("bad");
       setTimeout(() => mistakesEl.classList.remove("bad"), 400);
     }
     render();
     const el = board.children[selRow * 9 + selCol];
     el.classList.add(correct ? "flash-correct" : "flash-wrong");
-    if (mistakes >= MAX_MISTAKES && !won) { gameOver(); return; }
+    if (mistakes >= maxMistakes() && !won) { gameOver(); return; }
     checkWin();
   }
 
@@ -695,9 +730,11 @@
     clearInterval(timerInt);
     recordBest();
     const best = loadRecord().winBest[diff];
+    winEmoji.textContent = "🏆";
+    winTitle.textContent = "Puzzle solved!";
     winStats.innerHTML =
       "Difficulty: <b>" + diff.toUpperCase() + "</b><br>" +
-      "Time: <b>" + fmtTime(timer) + "</b> · Mistakes: <b>" + mistakes + "/" + MAX_MISTAKES + "</b>" +
+      "Time: <b>" + fmtTime(timer) + "</b> · Mistakes: <b>" + mistakes + "/" + maxMistakes() + "</b>" +
       (best ? "<br><br>Best for this level: <b>" + best.time + "</b> (" + best.mistakes + " mistakes, " + best.hints + " hints)" : "");
     winModal.classList.add("show");
     boardWrap.classList.add("won");
@@ -707,7 +744,12 @@
     won = true;
     clearInterval(timerInt);
     revealSolution();
-    winStats.innerHTML = "You ran out of mistakes (3).<br>The solution has been revealed.";
+    winEmoji.textContent = "💔";
+    winTitle.textContent = "Game over";
+    winStats.innerHTML =
+      "You ran out of mistakes (" + maxMistakes() + ").<br>" +
+      "Difficulty: <b>" + diff.toUpperCase() + "</b> · Time: <b>" + fmtTime(timer) + "</b><br>" +
+      "The solution has been revealed.";
     winModal.classList.add("show");
   }
 
@@ -726,9 +768,9 @@
   }
 
   // ---------- Timer ----------
-  function startTimer() {
+  function startTimer(keep) {
     clearInterval(timerInt);
-    timer = 0;
+    if (!keep) timer = 0;
     timerInt = setInterval(() => {
       timer++;
       timeEl.textContent = fmtTime(timer);
@@ -776,21 +818,44 @@
     grid = ip.grid;
     given = ip.given;
     solution = ip.solution;
-    pencil = ip.pencil.map(r => r.map(a => new Set(a)));
+    pencil = ip.pencil ? ip.pencil.map(r => r.map(a => new Set(a)))
+                       : Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => new Set()));
     history = (ip.history || []).map(h => ({ r: h.r, c: h.c, v: h.v, p: h.p ? new Set(h.p) : null }));
     timer = ip.timer || 0;
     mistakes = ip.mistakes || 0;
     won = false;
     hintsUsed = 0;
-    clearInterval(timerInt);
+    startTimer(true);
     timeEl.textContent = fmtTime(timer);
-    mistakesEl.textContent = mistakes + "/" + MAX_MISTAKES;
+    mistakesEl.textContent = mistakes + "/" + maxMistakes();
     hintsEl.textContent = "0";
     render();
     return true;
   }
 
   // ---------- New game ----------
+  function hasProgress() {
+    if (won || !grid) return false;
+    if (timer > 0 || mistakes > 0 || hintsUsed > 0) return true;
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (given[r][c] !== 1 && grid[r][c] !== 0) return true;
+        if (pencil[r][c] && pencil[r][c].size > 0) return true;
+      }
+    }
+    return false;
+  }
+
+  let pendingNewGame = null;
+  function requestNewGame(fn) {
+    if (hasProgress()) {
+      pendingNewGame = fn;
+      confirmModal.classList.add("show");
+    } else {
+      fn();
+    }
+  }
+
   function newGame(d) {
     if (d && LEVELS[d]) diff = d;
     clearInterval(timerInt);
@@ -802,7 +867,7 @@
     history = [];
     selRow = -1; selCol = -1;
     timeEl.textContent = "00:00";
-    mistakesEl.textContent = "0/" + MAX_MISTAKES;
+    mistakesEl.textContent = "0/" + maxMistakes();
     hintsEl.textContent = "0";
     boardWrap.classList.remove("won");
     winModal.classList.remove("show");
@@ -846,7 +911,7 @@
   }
 
   document.querySelectorAll("#difficulty button").forEach(b => {
-    b.addEventListener("click", () => newGame(b.dataset.diff));
+    b.addEventListener("click", () => requestNewGame(() => newGame(b.dataset.diff)));
   });
 
   board.addEventListener("click", (e) => {
@@ -885,20 +950,43 @@
     revealSolution();
   });
   document.getElementById("menuNew").addEventListener("click", () => {
-    menuModal.classList.remove("show");
-    newGame(diff);
+    requestNewGame(() => {
+      menuModal.classList.remove("show");
+      newGame(diff);
+    });
   });
 
   winModal.addEventListener("click", (e) => {
     if (e.target === winModal) winModal.classList.remove("show");
   });
   document.getElementById("winSame").addEventListener("click", () => {
-    winModal.classList.remove("show");
-    newGame(diff);
+    requestNewGame(() => {
+      winModal.classList.remove("show");
+      newGame(diff);
+    });
   });
   document.getElementById("winNew").addEventListener("click", () => {
-    winModal.classList.remove("show");
-    newGame();
+    requestNewGame(() => {
+      winModal.classList.remove("show");
+      newGame();
+    });
+  });
+
+  document.getElementById("confirmNew").addEventListener("click", () => {
+    confirmModal.classList.remove("show");
+    const fn = pendingNewGame;
+    pendingNewGame = null;
+    if (fn) fn();
+  });
+  document.getElementById("confirmCancel").addEventListener("click", () => {
+    confirmModal.classList.remove("show");
+    pendingNewGame = null;
+  });
+  confirmModal.addEventListener("click", (e) => {
+    if (e.target === confirmModal) {
+      confirmModal.classList.remove("show");
+      pendingNewGame = null;
+    }
   });
 
   window.addEventListener("beforeunload", saveInProgress);
